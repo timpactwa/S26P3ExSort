@@ -64,26 +64,26 @@ public class ExternalSort {
             records[i] = new Record(aRecord);
         }
         
-        // organizing the records using the min-heap sort
-        MinHeap heap = new MinHeap(records, 
-            sorter.numRecords, sorter.numRecords);
-        
-        // once sorted they must go back into the memory sorted
-        ByteBuffer output = ByteBuffer.wrap(sorter.workingMem, 
-            0, RECORDS_PER_BLK);
-        while (heap.heapSize() > 0) {
-            Record minRecord = heap.removeMin();
-            output.putInt(minRecord.getKey());
-            output.putInt(minRecord.getValue());
+        while (theFile.getFilePointer() < theFile.length()) {
+            // organizing the records using the min-heap sort
+            MinHeap heap = new MinHeap(records, 
+                sorter.numRecords, MEMBYTES - BLOCK_SIZE);
+            
+            // once sorted they must go back into the memory sorted
+            // buffers every 4096 bytes (1 block size) aka 512 records
+            ByteBuffer output = ByteBuffer.wrap(sorter.workingMem, 
+                0, RECORDS_PER_BLK);
+            while (heap.heapSize() > 0 && output.remaining() > 0) {
+                Record minRecord = heap.removeMin();
+                output.putInt(minRecord.getKey());
+                output.putInt(minRecord.getValue());
+            }
+            // setting up output buffer for next bytes of data
+            output.flip();
+            output.clear();
         }
         
-        // need to writeFile then close it
-        sorter.writeFile(theFile);
         theFile.close();
-        
-        // setting up output buffer for next bytes of data
-        output.flip();
-        output.clear();
     }
     
     /**
@@ -103,11 +103,12 @@ public class ExternalSort {
         int toRead = Math.min(fileSize, MEMBYTES);
         
         // make sure to read entire file past first 2048 bytes
-        while(totalRead < toRead) {
-            int readBytes = file.read(workingMem, totalRead, toRead - totalRead);
+        while (totalRead < toRead) {
+            int readBytes = file.read(workingMem, totalRead, 
+                toRead - totalRead);
             
             // nothing found case
-            if(readBytes < 0) break;
+            if (readBytes < 0) break;
             
             totalRead += readBytes;
         }
