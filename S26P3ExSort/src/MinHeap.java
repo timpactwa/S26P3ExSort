@@ -156,6 +156,15 @@ class MinHeap {
         heap[pos] = newVal;
         update(pos);
     }
+    
+ // ----------------------------------------------------------
+    /**
+     * Modifies the value at the given position and restores heap order.
+     * @return the capacity of the heap
+     */
+    public int capacity() {
+        return maxSize;
+    }
  
     // ----------------------------------------------------------
     /**
@@ -190,3 +199,4 @@ class MinHeap {
         return heap[pos1].getKey() < heap[pos2].getKey();
     }
 }
+

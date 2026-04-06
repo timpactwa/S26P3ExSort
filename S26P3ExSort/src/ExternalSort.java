@@ -72,11 +72,13 @@ public class ExternalSort {
             // once sorted they must go back into the memory sorted
             // buffers every 4096 bytes (1 block size) aka 512 records
             int heapBytes = 0;
+            int heapCapacity = heap.capacity();
+            int heapOffset = 0;
             while (heapBytes + BLOCK_SIZE <= heapCapacity 
                 && theFile.getFilePointer() < theFile.length()) {
                 
                 // reading in a block of records from the memory
-                theFile.read(sorter.workingMem, heapOffSet + heapBytes, BLOCK_SIZE);
+                theFile.read(sorter.workingMem, heapOffset + heapBytes, BLOCK_SIZE);
                 heapBytes += BLOCK_SIZE;
                 
                 // making output buffer
