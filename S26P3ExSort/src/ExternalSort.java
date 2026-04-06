@@ -52,9 +52,8 @@ public class ExternalSort {
         // be stored in with the initial size of the amt of records
         // accounted for from the sorter
         Record[] records = new Record[sorter.numRecords];
-        ByteBuffer buffer = ByteBuffer.wrap(sorter.workingMem, 
-            0, MEMBYTES - BLOCK_SIZE); 
-                // only 1 block is used for the output buffer
+        ByteBuffer buffer = ByteBuffer.wrap(sorter.workingMem,
+            0, sorter.numRecords * RECORD_SIZE);
         
         // going thru the sorter and fills the record array from 
         // the memory's stored records
@@ -93,14 +92,26 @@ public class ExternalSort {
      * @throws IOException when anything fails to be read
      */
     public void readFile(RandomAccessFile file) throws IOException {
+        // reset file pointer
         file.seek(0);
-        int readBytes = file.read(workingMem, 0, MEMBYTES);
-        // cannot be negative number 
-        // -> change readBytes to just threshold minimum of 0
-        if (readBytes < 0) {
-            readBytes = 0;
+        
+        int totalRead = 0;
+        
+        // read up to either the length of the file or the max memory pool
+        int fileSize = (int) file.length();
+        int toRead = Math.min(fileSize, MEMBYTES);
+        
+        // make sure to read entire file past first 2048 bytes
+        while(totalRead < toRead) {
+            int readBytes = file.read(workingMem, totalRead, toRead - totalRead);
+            
+            // nothing found case
+            if(readBytes < 0) break;
+            
+            totalRead += readBytes;
         }
-        numRecords = readBytes / RECORD_SIZE;
+        
+        numRecords = totalRead / RECORD_SIZE;
     }
     
     /**

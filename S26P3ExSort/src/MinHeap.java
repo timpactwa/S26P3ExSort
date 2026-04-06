@@ -93,6 +93,7 @@ class MinHeap {
     private void siftDown(int pos) {
         while (!isLeaf(pos)) {
             int child = leftChild(pos);
+            if (child >= n) return;
             if ((child + 1 < n) && isLessThan(child + 1, child)) {
                 child = child + 1; // child is now index with lesser value
             }
