@@ -71,16 +71,31 @@ public class ExternalSort {
             
             // once sorted they must go back into the memory sorted
             // buffers every 4096 bytes (1 block size) aka 512 records
-            ByteBuffer output = ByteBuffer.wrap(sorter.workingMem, 
-                0, RECORDS_PER_BLK);
-            while (heap.heapSize() > 0 && output.remaining() > 0) {
-                Record minRecord = heap.removeMin();
-                output.putInt(minRecord.getKey());
-                output.putInt(minRecord.getValue());
+            int heapBytes = 0;
+            while (heapBytes + BLOCK_SIZE <= heapCapacity 
+                && theFile.getFilePointer() < theFile.length()) {
+                
+                // reading in a block of records from the memory
+                theFile.read(sorter.workingMem, heapOffSet + heapBytes, BLOCK_SIZE);
+                heapBytes += BLOCK_SIZE;
+                
+                // making output buffer
+                ByteBuffer output = ByteBuffer.wrap(sorter.workingMem, 
+                    0, RECORDS_PER_BLK);
+                // putting the mins from the heap into the buffer until 
+                // it is full or the heap is empty
+                while (heap.heapSize() > 0) {
+                    if (output.remaining() == 0) {
+                        output.clear(); // clears buffer and sets position back to 0
+                    }
+                    Record minRecord = heap.removeMin();
+                    output.putInt(minRecord.getKey());
+                    output.putInt(minRecord.getValue());
+                }
+                // setting up output buffer for next bytes of data
+                output.flip();
+                output.clear();
             }
-            // setting up output buffer for next bytes of data
-            output.flip();
-            output.clear();
         }
         
         theFile.close();
