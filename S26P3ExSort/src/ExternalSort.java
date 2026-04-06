@@ -74,9 +74,9 @@ public class ExternalSort
                 ByteBuffer.wrap(sorter.workingMem, 0, bytesRead);
             for (int i = 0; i < numRecsLoaded; i++)
             {
-                byte[] rec = new byte[RECORD_SIZE];
-                heapBuf.get(rec);
-                records[i] = new Record(rec);
+                byte[] record = new byte[RECORD_SIZE];
+                heapBuf.get(record);
+                records[i] = new Record(record);
             }
 
             // makes the minheap with the block of current records
@@ -86,38 +86,38 @@ public class ExternalSort
             // into the output buffer and will push to the output 
             // file and reset buffer when it gets full 
             // (512 records in the buffer)
-            ByteBuffer outBuf = ByteBuffer
+            ByteBuffer outBuffer = ByteBuffer
                 .wrap(sorter.workingMem, outputBufferOffset, BLOCK_SIZE);
             int runBytes = 0;
             while (heap.heapSize() > 0)
             {
                 Record min = heap.removeMin();
-                outBuf.putInt(min.getKey());
-                outBuf.putInt(min.getValue());
+                outBuffer.putInt(min.getKey());
+                outBuffer.putInt(min.getValue());
 
                 // output buff is full, moves records into the 
                 // output file and clears
-                if (outBuf.remaining() == 0)
+                if (outBuffer.remaining() == 0)
                 {
                     tempFile.write(
                         sorter.workingMem,
                         outputBufferOffset,
                         BLOCK_SIZE);
-                    outBuf.clear();
+                    outBuffer.clear();
                     runBytes += BLOCK_SIZE;
                 }
             }
 
             // gets rid of any leftover records in the output 
             // buffer and puts into the output file
-            if (outBuf.position() > 0)
+            if (outBuffer.position() > 0)
             {
                 tempFile.write(
                     sorter.workingMem,
                     outputBufferOffset,
-                    outBuf.position());
-                runBytes += outBuf.position();
-                outBuf.clear();
+                    outBuffer.position());
+                runBytes += outBuffer.position();
+                outBuffer.clear();
             }
 
             runLengths[numRuns] = runBytes;
