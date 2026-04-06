@@ -53,7 +53,8 @@ public class ExternalSort {
         // accounted for from the sorter
         Record[] records = new Record[sorter.numRecords];
         ByteBuffer buffer = ByteBuffer.wrap(sorter.workingMem,
-            0, sorter.numRecords * RECORD_SIZE);
+            0, MEMBYTES - BLOCK_SIZE);
+            // - one block to account for output buffer's size
         
         // going thru the sorter and fills the record array from 
         // the memory's stored records
