@@ -53,17 +53,8 @@ public class ExternalSort {
         // accounted for from the sorter
         Record[] records = new Record[sorter.numRecords];
         ByteBuffer buffer = ByteBuffer.wrap(sorter.workingMem, 
-            0, sorter.numRecords * RECORD_SIZE);
-        
-        
-        
-        for (int i = 0; i < sorter.numRecords; i++) {
-            if (records[i] == null) {
-                System.out.println("null at index " + i);
-            }
-        }
-        
-        
+            0, MEMBYTES - BLOCK_SIZE); 
+                // only 1 block is used for the output buffer
         
         // going thru the sorter and fills the record array from 
         // the memory's stored records
@@ -73,19 +64,13 @@ public class ExternalSort {
             records[i] = new Record(aRecord);
         }
         
-        
-        System.out.println("numRecords = " + sorter.numRecords);
-        
-        
-        
-        
         // organizing the records using the min-heap sort
         MinHeap heap = new MinHeap(records, 
             sorter.numRecords, sorter.numRecords);
         
         // once sorted they must go back into the memory sorted
         ByteBuffer output = ByteBuffer.wrap(sorter.workingMem, 
-            0, sorter.numRecords * RECORD_SIZE);
+            0, RECORDS_PER_BLK);
         while (heap.heapSize() > 0) {
             Record minRecord = heap.removeMin();
             output.putInt(minRecord.getKey());
@@ -95,6 +80,10 @@ public class ExternalSort {
         // need to writeFile then close it
         sorter.writeFile(theFile);
         theFile.close();
+        
+        // setting up output buffer for next bytes of data
+        output.flip();
+        output.clear();
     }
     
     /**
