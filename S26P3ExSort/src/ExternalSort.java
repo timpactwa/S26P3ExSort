@@ -88,6 +88,7 @@ public class ExternalSort {
                     if (output.remaining() == 0) {
                         output.clear(); // clears buffer and sets position back to 0
                     }
+                    // putting min from heap into the output buffer
                     Record minRecord = heap.removeMin();
                     output.putInt(minRecord.getKey());
                     output.putInt(minRecord.getValue());
