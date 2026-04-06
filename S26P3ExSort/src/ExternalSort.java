@@ -56,7 +56,8 @@ public class ExternalSort
         while (theFile.getFilePointer() < theFile.length())
         {
 
-            // Fill the heap region of memory from the input file
+            // fills the heap section of the working memory 
+            // from the input file
             int bytesRead = 0;
             while (bytesRead < heapCapacity
                 && theFile.getFilePointer() < theFile.length())
@@ -67,7 +68,7 @@ public class ExternalSort
             }
             int numRecsLoaded = bytesRead / RECORD_SIZE;
 
-            // Parse records from heap region into array
+            // goes thru the records from heap section and puts into array
             Record[] records = new Record[numRecsLoaded];
             ByteBuffer heapBuf =
                 ByteBuffer.wrap(sorter.workingMem, 0, bytesRead);
@@ -78,21 +79,24 @@ public class ExternalSort
                 records[i] = new Record(rec);
             }
 
-            // Build min-heap
+            // makes the minheap with the block of current records
             MinHeap heap = new MinHeap(records, numRecsLoaded, numRecsLoaded);
 
-            // Extract mins into output buffer, flush when full
+            // takes all the mins from the heap and loads them 
+            // into the output buffer and will push to the output 
+            // file and reset buffer when it gets full 
+            // (512 records in the buffer)
             ByteBuffer outBuf = ByteBuffer
                 .wrap(sorter.workingMem, outputBufferOffset, BLOCK_SIZE);
             int runBytes = 0;
-
             while (heap.heapSize() > 0)
             {
                 Record min = heap.removeMin();
                 outBuf.putInt(min.getKey());
                 outBuf.putInt(min.getValue());
 
-                // When output buffer is full, flush to run file
+                // output buff is full, moves records into the 
+                // output file and clears
                 if (outBuf.remaining() == 0)
                 {
                     tempFile.write(
@@ -104,7 +108,8 @@ public class ExternalSort
                 }
             }
 
-            // Flush any leftover records in the output buffer
+            // gets rid of any leftover records in the output 
+            // buffer and puts into the output file
             if (outBuf.position() > 0)
             {
                 tempFile.write(
@@ -118,9 +123,6 @@ public class ExternalSort
             runLengths[numRuns] = runBytes;
             numRuns++;
         }
-
-        // === PHASE 2: Multiway merge (next step) ===
-        // ...
 
         theFile.close();
         tempFile.close();
