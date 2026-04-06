@@ -7,8 +7,7 @@ import java.io.*;
  * @author {Your Name Here}
  * @version Spring 2026
  */
-public class ExternalSort
-{
+public class ExternalSort {
 
     /**
      * The working memory available to the program: 50,000 bytes
@@ -37,9 +36,7 @@ public class ExternalSort
      *            The name of the file to be sorted
      * @throws IOException
      */
-    public static void sort(String theFileName)
-        throws IOException
-    {
+    public static void sort(String theFileName) throws IOException {
         ExternalSort sorter = new ExternalSort();
         RandomAccessFile theFile = new RandomAccessFile(theFileName, "rw");
         RandomAccessFile tempFile = new RandomAccessFile("TempFile", "rw");
@@ -53,15 +50,13 @@ public class ExternalSort
         int numRuns = 0;
         int[] runLengths = new int[100];
 
-        while (theFile.getFilePointer() < theFile.length())
-        {
+        while (theFile.getFilePointer() < theFile.length()) {
 
-            // fills the heap section of the working memory 
+            // fills the heap section of the working memory
             // from the input file
             int bytesRead = 0;
-            while (bytesRead < heapCapacity
-                && theFile.getFilePointer() < theFile.length())
-            {
+            while (bytesRead < heapCapacity && theFile
+                .getFilePointer() < theFile.length()) {
                 int toRead = Math.min(BLOCK_SIZE, heapCapacity - bytesRead);
                 theFile.read(sorter.workingMem, bytesRead, toRead);
                 bytesRead += toRead;
@@ -70,10 +65,9 @@ public class ExternalSort
 
             // goes thru the records from heap section and puts into array
             Record[] records = new Record[numRecsLoaded];
-            ByteBuffer heapBuf =
-                ByteBuffer.wrap(sorter.workingMem, 0, bytesRead);
-            for (int i = 0; i < numRecsLoaded; i++)
-            {
+            ByteBuffer heapBuf = ByteBuffer.wrap(sorter.workingMem, 0,
+                bytesRead);
+            for (int i = 0; i < numRecsLoaded; i++) {
                 byte[] record = new byte[RECORD_SIZE];
                 heapBuf.get(record);
                 records[i] = new Record(record);
@@ -82,40 +76,33 @@ public class ExternalSort
             // makes the minheap with the block of current records
             MinHeap heap = new MinHeap(records, numRecsLoaded, numRecsLoaded);
 
-            // takes all the mins from the heap and loads them 
-            // into the output buffer and will push to the output 
-            // file and reset buffer when it gets full 
+            // takes all the mins from the heap and loads them
+            // into the output buffer and will push to the output
+            // file and reset buffer when it gets full
             // (512 records in the buffer)
-            ByteBuffer outBuffer = ByteBuffer
-                .wrap(sorter.workingMem, outputBufferOffset, BLOCK_SIZE);
+            ByteBuffer outBuffer = ByteBuffer.wrap(sorter.workingMem,
+                outputBufferOffset, BLOCK_SIZE);
             int runBytes = 0;
-            while (heap.heapSize() > 0)
-            {
+            while (heap.heapSize() > 0) {
                 Record min = heap.removeMin();
                 outBuffer.putInt(min.getKey());
                 outBuffer.putInt(min.getValue());
 
-                // output buff is full, moves records into the 
+                // output buff is full, moves records into the
                 // output file and clears
-                if (outBuffer.remaining() == 0)
-                {
-                    tempFile.write(
-                        sorter.workingMem,
-                        outputBufferOffset,
+                if (outBuffer.remaining() == 0) {
+                    tempFile.write(sorter.workingMem, outputBufferOffset,
                         BLOCK_SIZE);
                     outBuffer.clear();
                     runBytes += BLOCK_SIZE;
                 }
             }
 
-            // gets rid of any leftover records in the output 
+            // gets rid of any leftover records in the output
             // buffer and puts into the output file
-            if (outBuffer.position() > 0)
-            {
-                tempFile.write(
-                    sorter.workingMem,
-                    outputBufferOffset,
-                    outBuffer.position());
+            if (outBuffer.position() > 0) {
+                tempFile.write(sorter.workingMem, outputBufferOffset, outBuffer
+                    .position());
                 runBytes += outBuffer.position();
                 outBuffer.clear();
             }
@@ -124,41 +111,151 @@ public class ExternalSort
             numRuns++;
         }
 
+        // one run writing into the output file
+        if (numRuns == 1) {
+            tempFile.seek(0);
+            theFile.seek(0);
+
+            int remaining = runLengths[0];
+            int copied = 0;
+            while (copied < remaining) {
+                int toRead = Math.min(BLOCK_SIZE, remaining - copied);
+                tempFile.read(sorter.workingMem, 0, toRead);
+                theFile.write(sorter.workingMem, 0, toRead);
+                copied += toRead;
+            }
+        }
+        // multiple runs of sort occurred
+        // need to combine since there is more than one buffer
+        else {
+            
+            // setting up and filling in the bufferOnset array
+            int[] bufferOffset = new int[numRuns];
+            for (int i = 0; i < numRuns; i++) {
+                // each run has to be 4096 bytes because the specs
+                // say that the input file has a byte size of a
+                // multiple of 4096
+                bufferOffset[i] = i * BLOCK_SIZE;
+            }
+            int outputBufOffset = numRuns * BLOCK_SIZE;
+
+            // initializing parallel arrays needed to merge the
+            // runs together so that all the data for the runs
+            // are kept in order
+            int[] bufPos = new int[numRuns]; // current record index within
+                                             // buffer
+            int[] recsInBuf = new int[numRuns]; // records currently loaded in
+                                                // each
+                                                // run's buffer
+            int[] runRemaining = new int[numRuns]; // bytes left to read from
+                                                   // disk
+                                                   // for each run
+            int[] runFilePosition = new int[numRuns]; // read position in temp
+                                                      // file
+            int activeRuns = numRuns;
+
+            int offset = 0;
+            for (int i = 0; i < numRuns; i++) {
+                runFilePosition[i] = offset;
+                runRemaining[i] = runLengths[i];
+                offset += runLengths[i];
+            }
+
+            // load first block from each run
+            for (int i = 0; i < numRuns; i++) {
+                int toRead = Math.min(BLOCK_SIZE, runRemaining[i]);
+                tempFile.seek(runFilePosition[i]);
+                tempFile.read(sorter.workingMem, bufferOffset[i], toRead);
+                // updating run file pos
+                runFilePosition[i] += toRead;
+                // decrementing amt of bytes left for the currect run
+                runRemaining[i] -= toRead;
+                recsInBuf[i] = toRead / RECORD_SIZE;
+                bufPos[i] = 0;
+            }
+
+            ByteBuffer outBuffer = ByteBuffer.wrap(sorter.workingMem,
+                outputBufOffset, BLOCK_SIZE);
+            theFile.seek(0);
+
+            // iterates through the active runs finding the subsequent min
+            // values in every buffer to add to the output file
+            while (activeRuns > 0) {
+                int tempMin = Integer.MAX_VALUE;
+                int minBuffer = -1;
+
+                // tracking which runs still need to be used
+                for (int i = 0; i < numRuns; i++) {
+                    if (recsInBuf[i] == 0)
+                        continue;
+                    // run is active, find the minimum in this run
+                    // making it so we can access the key and val of the
+                    // specific
+                    // buffer's data
+                    int recordOffset = bufferOffset[i] + (bufPos[i]
+                        * RECORD_SIZE);
+                    ByteBuffer bb = ByteBuffer.wrap(sorter.workingMem,
+                        recordOffset, RECORD_SIZE);
+                    int key = bb.getInt();
+                    int val = bb.getInt();
+
+                    // checking whether current buffer's smallest
+                    // record is smaller than tempMin variable
+                    if (key < tempMin) {
+                        tempMin = key;
+                        minBuffer = i; // keeping track of which buffer has the
+                                       // smallest record
+                    }
+                    // if not smaller, will skip this buffer and go to the next
+                    // active buffer
+                }
+                if (minBuffer == -1)
+                    break; // all runs are completely used
+
+                // write current min to output buffer
+                int minOffset = bufferOffset[minBuffer] + (bufPos[minBuffer]
+                    * RECORD_SIZE);
+                outBuffer.put(sorter.workingMem, minOffset, RECORD_SIZE);
+                bufPos[minBuffer]++;
+
+                // flush buffer if it's full
+                if (outBuffer.remaining() == 0) {
+                    theFile.write(sorter.workingMem, outputBufOffset,
+                        BLOCK_SIZE);
+                    outBuffer.clear();
+                }
+
+                // refill the curr run's buffer if it got used
+                if (bufPos[minBuffer] >= recsInBuf[minBuffer]) {
+                    if (runRemaining[minBuffer] > 0) {
+                        int toRead = Math.min(BLOCK_SIZE,
+                            runRemaining[minBuffer]);
+                        tempFile.seek(runFilePosition[minBuffer]);
+                        tempFile.read(sorter.workingMem,
+                            bufferOffset[minBuffer], toRead);
+                        runFilePosition[minBuffer] += toRead;
+                        runRemaining[minBuffer] -= toRead;
+                        recsInBuf[minBuffer] = toRead / RECORD_SIZE;
+                        bufPos[minBuffer] = 0;
+                    }
+                    else {
+                        recsInBuf[minBuffer] = 0;
+                        activeRuns--;
+                    }
+                }
+            }
+
+            // precaution to flush again in case there are
+            // more records in the output buffer
+            if (outBuffer.position() > 0) {
+                theFile.write(sorter.workingMem, outputBufOffset, outBuffer
+                    .position());
+                outBuffer.clear();
+            }
+        }
+
         theFile.close();
         tempFile.close();
-
-        /*
-         * // Allocate 50,000 bytes of working memory //byte[] workingMem = new
-         * byte[MEMBYTES]; // reads the binary file in sorter.readFile(theFile);
-         * // making an empty array for the records to // be stored in with the
-         * initial size of the amt of records // accounted for from the sorter
-         * Record[] records = new Record[sorter.numRecords]; ByteBuffer buffer =
-         * ByteBuffer.wrap(sorter.workingMem, 0, MEMBYTES - BLOCK_SIZE); // -
-         * one block to account for output buffer's size // going thru the
-         * sorter and fills the record array from // the memory's stored records
-         * for (int i = 0; i < sorter.numRecords; i++) { byte[] aRecord = new
-         * byte[RECORD_SIZE]; buffer.get(aRecord); records[i] = new
-         * Record(aRecord); } while (theFile.getFilePointer() <
-         * theFile.length()) { // organizing the records using the min-heap sort
-         * MinHeap heap = new MinHeap(records, sorter.numRecords, MEMBYTES -
-         * BLOCK_SIZE); // once sorted they must go back into the memory sorted
-         * // buffers every 4096 bytes (1 block size) aka 512 records int
-         * heapBytes = 0; int heapCapacity = heap.capacity(); int heapOffset =
-         * 0; while (heapBytes + BLOCK_SIZE <= heapCapacity &&
-         * theFile.getFilePointer() < theFile.length()) { // reading in a block
-         * of records from the memory theFile.read(sorter.workingMem, heapOffset
-         * + heapBytes, BLOCK_SIZE); heapBytes += BLOCK_SIZE; // making output
-         * buffer ByteBuffer output = ByteBuffer.wrap(sorter.workingMem, 0,
-         * RECORDS_PER_BLK); // putting the mins from the heap into the buffer
-         * until // it is full or the heap is empty while (heap.heapSize() > 0)
-         * { if (output.remaining() == 0) { output.clear(); // clears buffer and
-         * sets position back to 0 } // putting min from heap into the output
-         * buffer Record minRecord = heap.removeMin();
-         * output.putInt(minRecord.getKey());
-         * output.putInt(minRecord.getValue()); } // setting up output buffer
-         * for next bytes of data output.flip(); output.clear(); } }
-         * theFile.close();
-         */
     }
 
 
@@ -170,9 +267,7 @@ public class ExternalSort
      * @throws IOException
      *             when anything fails to be read
      */
-    public void readFile(RandomAccessFile file)
-        throws IOException
-    {
+    public void readFile(RandomAccessFile file) throws IOException {
         // reset file pointer
         file.seek(0);
 
@@ -183,10 +278,9 @@ public class ExternalSort
         int toRead = Math.min(fileSize, MEMBYTES);
 
         // make sure to read entire file past first 2048 bytes
-        while (totalRead < toRead)
-        {
-            int readBytes =
-                file.read(workingMem, totalRead, toRead - totalRead);
+        while (totalRead < toRead) {
+            int readBytes = file.read(workingMem, totalRead, toRead
+                - totalRead);
 
             // nothing found case
             if (readBytes < 0)
@@ -207,14 +301,11 @@ public class ExternalSort
      * @throws IOException
      *             when anything fails to be written
      */
-    public void writeFile(RandomAccessFile file)
-        throws IOException
-    {
+    public void writeFile(RandomAccessFile file) throws IOException {
         int totalBytesFound = numRecords * RECORD_SIZE;
         int numWritten = 0;
         file.seek(0);
-        while (numWritten < totalBytesFound)
-        {
+        while (numWritten < totalBytesFound) {
             // making it easier by taking it sections at a time to
             // write it into the file
             int section = Math.min(BLOCK_SIZE, totalBytesFound - numWritten);
