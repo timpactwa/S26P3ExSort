@@ -190,6 +190,8 @@ public class MinHeap {
     public void insert(Record rec) {
         byte[] data = rec.toBytes();
         System.arraycopy(data, 0, mem, byteOffset(numHeapRecords), RECORD_SIZE);
+        // updates num records in heap and resorts the heap to 
+        // make it a minHeap again now with the new value
         numHeapRecords++;
         siftUp(numHeapRecords - 1);
     }
@@ -209,13 +211,9 @@ public class MinHeap {
         update(pos);
     }
 
-// ----------------------------------------------------------
-// Private helpers
-// ----------------------------------------------------------
-
-
     /**
-     * Computes the byte offset in mem for record at index pos.
+     * Helper method that computes the byte offset in 
+     * mem for record at index pos.
      *
      * @param pos
      *            record index
@@ -227,7 +225,8 @@ public class MinHeap {
 
 
     /**
-     * Reads the 4-byte integer key of the record at index pos.
+     * Helper method that reads the 4-byte integer 
+     * key of the record at index pos.
      *
      * @param pos
      *            record index
@@ -241,7 +240,8 @@ public class MinHeap {
 
 
     /**
-     * Returns true if the record at pos1 has a smaller key than pos2.
+     * Helper method that returns true if the record 
+     * at pos1 has a smaller key than pos2.
      *
      * @param pos1
      *            first position
@@ -255,7 +255,7 @@ public class MinHeap {
 
 
     /**
-     * Swaps two records in the memory pool.
+     * Helper method that swaps two records in the memory pool.
      *
      * @param pos1
      *            first record index
@@ -263,8 +263,10 @@ public class MinHeap {
      *            second record index
      */
     private void swap(int pos1, int pos2) {
+        // finding the offsets of both positions in the memory pool
         int off1 = byteOffset(pos1);
         int off2 = byteOffset(pos2);
+        // swapping the records with a temp holder variable
         System.arraycopy(mem, off1, swapTemp, 0, RECORD_SIZE);
         System.arraycopy(mem, off2, mem, off1, RECORD_SIZE);
         System.arraycopy(swapTemp, 0, mem, off2, RECORD_SIZE);
@@ -272,9 +274,11 @@ public class MinHeap {
 
 
     /**
-     * Builds the heap from the existing data in the memory region.
+     * Helper method that builds the heap from 
+     * the existing data in the memory pool section.
      */
     private void buildHeap() {
+        // minHeap sorting the data from the memory pool
         for (int i = parent(numHeapRecords - 1); i >= 0; i--) {
             siftDown(i);
         }
@@ -282,7 +286,8 @@ public class MinHeap {
 
 
     /**
-     * Sifts element at pos down to restore min-heap property.
+     * Helper method that sifts element at pos 
+     * down to restore min-heap property.
      *
      * @param pos
      *            starting position
@@ -306,7 +311,8 @@ public class MinHeap {
 
 
     /**
-     * Sifts element at pos up to restore min-heap property.
+     * Helper method that sifts element at pos 
+     * up to restore min-heap property.
      *
      * @param pos
      *            starting position
@@ -324,7 +330,8 @@ public class MinHeap {
 
 
     /**
-     * Restores heap property after a value at pos has changed.
+     * Helper method that restores heap property 
+     * after a value at pos has changed.
      *
      * @param pos
      *            position of changed element
