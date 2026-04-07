@@ -66,4 +66,52 @@ public class ExternalSortTest extends TestCase
     {
         sortHelper(1);
     }
+    
+    public void test2()
+        throws Exception
+    {
+        sortHelper(2);
+    }
+    
+    public void test10()
+        throws Exception
+    {
+        sortHelper(10);
+    }
+    
+    public void test100()
+        throws Exception
+    {
+        sortHelper(100);
+    }
+    
+    public void test101()
+        throws Exception
+    {
+        sortHelper(101);
+    }
+    
+    public void test130()
+        throws Exception
+    {
+        sortHelper(130);
+    }
+    
+    public void test200()
+        throws Exception
+    {
+        sortHelper(200);
+    }
+    
+    public void test1001()
+        throws Exception
+    {
+        sortHelper(1001);
+    }
+    
+    public void test2048()
+        throws Exception
+    {
+        sortHelper(2048);
+    }
 }
