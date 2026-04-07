@@ -48,7 +48,8 @@ public class ExternalSort {
         theFile.seek(0);
 
         int numRuns = 0;
-        int[] runLengths = new int[100];
+        int maxRuns = (int) (theFile.length() / heapCapacity) + 2;
+        int[] runLengths = new int[maxRuns];
 
         while (theFile.getFilePointer() < theFile.length()) {
 
@@ -125,6 +126,7 @@ public class ExternalSort {
                 copied += toRead;
             }
         }
+        
         // multiple runs of sort occurred
         // need to combine since there is more than one buffer
         else {
