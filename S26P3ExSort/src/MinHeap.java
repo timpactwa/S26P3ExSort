@@ -1,202 +1,327 @@
+import java.nio.ByteBuffer;
+
 /**
- * Min-heap implementation for sorting Record objects by key value.
+ * Min-heap that operates directly on a byte array (the working memory pool). No
+ * separate Record[] is allocated, all data stays in the memory pool.
  *
- * @author {Your Name Here}
+ * @author Brianna McDonald, Timothy Pactwa
  * @version Spring 2026
  */
-class MinHeap {
-    private Record[] heap; // Pointer to the heap array
-    private int maxSize;   // Maximum size of the heap
-    private int n;         // Number of elements currently in heap
- 
-    // ----------------------------------------------------------
+class MinHeap
+{
+
+    private static final int RECORD_SIZE = 8; // size of each record in bytes
+
+    private byte[] mem; // Reference to the working memory pool
+
+    private int baseOffset;  // Byte offset in mem where the heap region begins.
+
+    private int maxCapacity;     // Maximum number of records the heap can hold.
+
+    private int size; // Current number of records in the heap.
+
+    private byte[] swapTemp = new byte[RECORD_SIZE]; // Temporary buffer for
+                                                     // swapping records (8
+                                                     // bytes).
+
     /**
-     * Constructor supporting preloading of heap contents.
-     * @param r        array of Records to heapify
-     * @param heapSize number of valid records in the array
-     * @param max      maximum capacity of the heap
+     * Constructs a MinHeap on a portion of the given byte array and builds the
+     * heap from the existing data in that region.
+     *
+     * @param memPool
+     *            the working memory byte array
+     * @param offset
+     *            byte offset where heap data begins in memPool
+     * @param heapSize
+     *            number of records currently in the region
+     * @param max
+     *            maximum number of records the region can hold
      */
-    MinHeap(Record[] r, int heapSize, int max) {
-        heap = r;
-        n = heapSize;
-        maxSize = max;
+    MinHeap(byte[] memPool, int offset, int heapSize, int max)
+    {
+        mem = memPool;
+        baseOffset = offset;
+        size = heapSize;
+        maxCapacity = max;
         buildHeap();
     }
- 
-    // ----------------------------------------------------------
+
+
     /**
      * Returns the current number of elements in the heap.
+     *
      * @return current heap size
      */
-    public int heapSize() { return n; }
- 
-    // ----------------------------------------------------------
+    public int heapSize()
+    {
+        return size;
+    }
+
+
     /**
-     * Returns true if pos is a leaf position, false otherwise.
-     * @param pos position to check
+     * Returns the maximum capacity of the heap.
+     *
+     * @return max capacity in records
+     */
+    public int capacity()
+    {
+        return maxCapacity;
+    }
+
+
+    /**
+     * Returns true if pos is a leaf position.
+     *
+     * @param pos
+     *            position to check
      * @return true if pos is a leaf
      */
-    public boolean isLeaf(int pos) {
-        return (n / 2 <= pos) && (pos < n);
+    public boolean isLeaf(int pos)
+    {
+        return (size / 2 <= pos) && (pos < size);
     }
- 
-    // ----------------------------------------------------------
+
+
     /**
-     * Returns the position of the left child of pos.
-     * @param pos parent position
+     * Returns the position of the left child.
+     *
+     * @param pos
+     *            parent position
      * @return left child position
      */
-    public static int leftChild(int pos) { return 2 * pos + 1; }
- 
-    // ----------------------------------------------------------
+    public static int leftChild(int pos)
+    {
+        return 2 * pos + 1;
+    }
+
+
     /**
-     * Returns the position of the right child of pos.
-     * @param pos parent position
+     * Returns the position of the right child.
+     *
+     * @param pos
+     *            parent position
      * @return right child position
      */
-    public static int rightChild(int pos) { return 2 * pos + 2; }
- 
-    // ----------------------------------------------------------
+    public static int rightChild(int pos)
+    {
+        return 2 * pos + 2;
+    }
+
+
     /**
-     * Returns the position of the parent of pos.
-     * @param pos child position
+     * Returns the position of the parent.
+     *
+     * @param pos
+     *            child position
      * @return parent position
      */
-    public static int parent(int pos) { return (pos - 1) / 2; }
- 
-    // ----------------------------------------------------------
-    /**
-     * Inserts a new Record into the heap.
-     * @param key the Record to insert
-     */
-    public void insert(Record key) {
-        heap[n] = key;
-        n++;
-        siftUp(n - 1);
+    public static int parent(int pos)
+    {
+        return (pos - 1) / 2;
     }
- 
-    // ----------------------------------------------------------
+
+
     /**
-     * Heapifies the contents of the heap array.
+     * Removes and returns the minimum record from the heap.
+     *
+     * @return the Record with the smallest key
      */
-    private void buildHeap() {
-        for (int i = parent(n - 1); i >= 0; i--) {
+    public Record removeMin()
+    {
+        // Copy min record data before it gets overwritten
+        byte[] minData = new byte[RECORD_SIZE];
+        System.arraycopy(mem, byteOffset(0), minData, 0, RECORD_SIZE);
+
+        size--;
+        swap(0, size);
+        siftDown(0);
+
+        return new Record(minData);
+    }
+
+
+    /**
+     * Removes and returns the record at the specified position.
+     *
+     * @param pos
+     *            position of element to remove
+     * @return the Record that was at pos
+     */
+    public Record remove(int pos)
+    {
+        byte[] data = new byte[RECORD_SIZE];
+        System.arraycopy(mem, byteOffset(pos), data, 0, RECORD_SIZE);
+
+        size--;
+        swap(pos, size);
+        update(pos);
+
+        return new Record(data);
+    }
+
+
+    /**
+     * Inserts a new Record into the heap by writing its bytes into the next
+     * open slot in the memory pool.
+     *
+     * @param rec
+     *            the Record to insert
+     */
+    public void insert(Record rec)
+    {
+        byte[] data = rec.toBytes();
+        System.arraycopy(data, 0, mem, byteOffset(size), RECORD_SIZE);
+        size++;
+        siftUp(size - 1);
+    }
+
+
+    /**
+     * Modifies the record at pos with new data and restores heap order.
+     *
+     * @param pos
+     *            position to modify
+     * @param newVal
+     *            new Record value
+     */
+    public void modify(int pos, Record newVal)
+    {
+        byte[] data = newVal.toBytes();
+        System.arraycopy(data, 0, mem, byteOffset(pos), RECORD_SIZE);
+        update(pos);
+    }
+
+
+    /**
+     * Computes the byte offset in mem for record at index pos.
+     *
+     * @param pos
+     *            record index
+     * @return byte offset in mem
+     */
+    private int byteOffset(int pos)
+    {
+        return baseOffset + pos * RECORD_SIZE;
+    }
+
+
+    /**
+     * Reads the 4-byte integer key of the record at index pos.
+     *
+     * @param pos
+     *            record index
+     * @return the key value
+     */
+    private int getKey(int pos)
+    {
+        return ByteBuffer.wrap(mem, byteOffset(pos), 4).getInt();
+    }
+
+
+    /**
+     * Returns true if the record at pos1 has a smaller key than pos2.
+     *
+     * @param pos1
+     *            first position
+     * @param pos2
+     *            second position
+     * @return true if key at pos1 < key at pos2
+     */
+    private boolean isLessThan(int pos1, int pos2)
+    {
+        return getKey(pos1) < getKey(pos2);
+    }
+
+
+    /**
+     * Swaps two records in the memory pool.
+     *
+     * @param pos1
+     *            first record index
+     * @param pos2
+     *            second record index
+     */
+    private void swap(int pos1, int pos2)
+    {
+        int off1 = byteOffset(pos1);
+        int off2 = byteOffset(pos2);
+        System.arraycopy(mem, off1, swapTemp, 0, RECORD_SIZE);
+        System.arraycopy(mem, off2, mem, off1, RECORD_SIZE);
+        System.arraycopy(swapTemp, 0, mem, off2, RECORD_SIZE);
+    }
+
+
+    /**
+     * Builds the heap from the existing data in the memory region.
+     */
+    private void buildHeap()
+    {
+        for (int i = parent(size - 1); i >= 0; i--)
+        {
             siftDown(i);
         }
     }
- 
-    // ----------------------------------------------------------
+
+
     /**
-     * Moves an element down to its correct position.
-     * @param pos position of element to sift down
+     * Sifts element at pos down to restore min-heap property.
+     *
+     * @param pos
+     *            starting position
      */
-    private void siftDown(int pos) {
-        while (!isLeaf(pos)) {
+    private void siftDown(int pos)
+    {
+        while (!isLeaf(pos))
+        {
             int child = leftChild(pos);
-            if (child >= n) return;
-            if ((child + 1 < n) && isLessThan(child + 1, child)) {
-                child = child + 1; // child is now index with lesser value
+            if (child >= size)
+            {
+                return;
             }
-            if (!isLessThan(child, pos)) {
-                return; // stop early
+            if ((child + 1 < size) && isLessThan(child + 1, child))
+            {
+                child = child + 1;
+            }
+            if (!isLessThan(child, pos))
+            {
+                return;
             }
             swap(pos, child);
-            pos = child; // keep sifting down
+            pos = child;
         }
     }
- 
-    // ----------------------------------------------------------
+
+
     /**
-     * Moves an element up to its correct position.
-     * @param pos position of element to sift up
+     * Sifts element at pos up to restore min-heap property.
+     *
+     * @param pos
+     *            starting position
      */
-    private void siftUp(int pos) {
-        while (pos > 0) {
+    private void siftUp(int pos)
+    {
+        while (pos > 0)
+        {
             int par = parent(pos);
-            if (isLessThan(par, pos)) {
-                return; // stop early
+            if (isLessThan(par, pos))
+            {
+                return;
             }
             swap(pos, par);
-            pos = par; // keep sifting up
+            pos = par;
         }
     }
- 
-    // ----------------------------------------------------------
-    /**
-     * Removes and returns the minimum value from the heap.
-     * @return the Record with the smallest key
-     */
-    public Record removeMin() {
-        n--;
-        swap(0, n);
-        siftDown(0);
-        return heap[n];
-    }
- 
-    // ----------------------------------------------------------
-    /**
-     * Removes and returns the element at the specified position.
-     * @param pos position of element to remove
-     * @return the Record at pos
-     */
-    public Record remove(int pos) {
-        n--;
-        swap(pos, n);
-        update(pos);
-        return heap[n];
-    }
- 
-    // ----------------------------------------------------------
-    /**
-     * Modifies the value at the given position and restores heap order.
-     * @param pos    position to modify
-     * @param newVal new Record value
-     */
-    public void modify(int pos, Record newVal) {
-        heap[pos] = newVal;
-        update(pos);
-    }
-    
- // ----------------------------------------------------------
-    /**
-     * Modifies the value at the given position and restores heap order.
-     * @return the capacity of the heap
-     */
-    public int capacity() {
-        return maxSize;
-    }
- 
-    // ----------------------------------------------------------
+
+
     /**
      * Restores heap property after a value at pos has changed.
-     * @param pos position of changed element
+     *
+     * @param pos
+     *            position of changed element
      */
-    private void update(int pos) {
+    private void update(int pos)
+    {
         siftUp(pos);
         siftDown(pos);
     }
- 
-    // ----------------------------------------------------------
-    /**
-     * Swaps the elements at two positions in the heap.
-     * @param pos1 first position
-     * @param pos2 second position
-     */
-    private void swap(int pos1, int pos2) {
-        Record temp = heap[pos1];
-        heap[pos1] = heap[pos2];
-        heap[pos2] = temp;
-    }
- 
-    // ----------------------------------------------------------
-    /**
-     * Returns true if the Record at pos1 has a smaller key than pos2.
-     * @param pos1 first position
-     * @param pos2 second position
-     * @return true if heap[pos1].key < heap[pos2].key
-     */
-    private boolean isLessThan(int pos1, int pos2) {
-        return heap[pos1].getKey() < heap[pos2].getKey();
-    }
 }
-
