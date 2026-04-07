@@ -1,3 +1,5 @@
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import student.TestCase;
 
 /**
@@ -158,5 +160,67 @@ public class ExternalSortTest extends TestCase {
         assertTrue(systemOut().getHistory()
             .contains("There is no such input file as |fakeFile.bin|"));
         
+    }
+    
+    /**
+     * Testing records
+     */
+    public void testRecords() {
+        byte[] bytes = new byte[8];
+        ByteBuffer buff = ByteBuffer.wrap(bytes);
+        int key = 4444;
+        int val = 7777;
+        buff.putInt(key);
+        buff.putInt(val);
+        
+        Record rec = new Record(bytes);
+        assertEquals("Key should be 4444", key, rec.getKey());
+        assertEquals("Value should be 7777", val, rec.getValue());
+    }
+    
+    /**
+     * Testing records
+     */
+    public void testRecords2() {
+        byte[] bytes = new byte[8];
+        ByteBuffer buff = ByteBuffer.wrap(bytes);
+        int key = 4444;
+        int val = 7777;
+        buff.putInt(key);
+        buff.putInt(val);
+        
+        Record rec = new Record(bytes);
+        byte[] expected = rec.toBytes();
+        
+        assertEquals("Byte array length should be 8", 8, expected.length);
+        assertTrue("The output bytes should match the original bytes", Arrays.equals(bytes, expected));
+        
+        assertEquals("Key should be 4444", key, rec.getKey());
+        assertEquals("Value should be 7777", val, rec.getValue());
+    }
+    
+    /**
+     * Testing heap
+     */
+    public void testHeap1() {
+        byte[] pool = new byte[40];
+        MinHeap heap = new MinHeap(pool, 0, 0, 5);
+        assertEquals("Heap size should initially be 0", 0, heap.heapSize());
+        
+        byte[] recBytes = new byte[8];
+        Record rec = new Record(recBytes);
+        byte[] recBytes2 = new byte[8];
+        Record rec2 = new Record(recBytes2);
+        
+        heap.insert(rec);
+        assertEquals("Heap size should be 1 after one insertion", 1, heap.heapSize());
+        heap.insert(rec2);
+        assertEquals("Heap size should be 2 after second insertion", 2, heap.heapSize());
+        
+        heap.removeMin();
+        assertEquals("Heap size should be 1 after removing the minimum", 1, heap.heapSize());
+        
+        MinHeap heap2 = new MinHeap(pool, 0, 3, 5);
+        assertEquals("Heap size should match the initial size passed to constructor", 3, heap2.heapSize());
     }
 }
