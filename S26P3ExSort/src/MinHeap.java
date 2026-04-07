@@ -16,9 +16,9 @@ class MinHeap
 
     private int baseOffset;  // Byte offset in mem where the heap region begins.
 
-    private int maxSize;     // Maximum number of records the heap can hold.
+    private int maxCapacity;     // Maximum number of records the heap can hold.
 
-    private int n; // Current number of records in the heap.
+    private int size; // Current number of records in the heap.
 
     private byte[] swapTemp = new byte[RECORD_SIZE]; // Temporary buffer for
                                                      // swapping records (8
@@ -41,8 +41,8 @@ class MinHeap
     {
         mem = memPool;
         baseOffset = offset;
-        n = heapSize;
-        maxSize = max;
+        size = heapSize;
+        maxCapacity = max;
         buildHeap();
     }
 
@@ -54,7 +54,7 @@ class MinHeap
      */
     public int heapSize()
     {
-        return n;
+        return size;
     }
 
 
@@ -65,7 +65,7 @@ class MinHeap
      */
     public int capacity()
     {
-        return maxSize;
+        return maxCapacity;
     }
 
 
@@ -78,7 +78,7 @@ class MinHeap
      */
     public boolean isLeaf(int pos)
     {
-        return (n / 2 <= pos) && (pos < n);
+        return (size / 2 <= pos) && (pos < size);
     }
 
 
@@ -132,8 +132,8 @@ class MinHeap
         byte[] minData = new byte[RECORD_SIZE];
         System.arraycopy(mem, byteOffset(0), minData, 0, RECORD_SIZE);
 
-        n--;
-        swap(0, n);
+        size--;
+        swap(0, size);
         siftDown(0);
 
         return new Record(minData);
@@ -152,8 +152,8 @@ class MinHeap
         byte[] data = new byte[RECORD_SIZE];
         System.arraycopy(mem, byteOffset(pos), data, 0, RECORD_SIZE);
 
-        n--;
-        swap(pos, n);
+        size--;
+        swap(pos, size);
         update(pos);
 
         return new Record(data);
@@ -170,9 +170,9 @@ class MinHeap
     public void insert(Record rec)
     {
         byte[] data = rec.toBytes();
-        System.arraycopy(data, 0, mem, byteOffset(n), RECORD_SIZE);
-        n++;
-        siftUp(n - 1);
+        System.arraycopy(data, 0, mem, byteOffset(size), RECORD_SIZE);
+        size++;
+        siftUp(size - 1);
     }
 
 
@@ -256,7 +256,7 @@ class MinHeap
      */
     private void buildHeap()
     {
-        for (int i = parent(n - 1); i >= 0; i--)
+        for (int i = parent(size - 1); i >= 0; i--)
         {
             siftDown(i);
         }
@@ -274,11 +274,11 @@ class MinHeap
         while (!isLeaf(pos))
         {
             int child = leftChild(pos);
-            if (child >= n)
+            if (child >= size)
             {
                 return;
             }
-            if ((child + 1 < n) && isLessThan(child + 1, child))
+            if ((child + 1 < size) && isLessThan(child + 1, child))
             {
                 child = child + 1;
             }
