@@ -1,110 +1,71 @@
 import java.nio.*;
 import java.io.*;
 
-// The External Sort implementation
-// -------------------------------------------------------------------------
 /**
  * @author Brianna McDonald, Tim Pactwa
  * @version Spring 2026
  */
 public class ExternalSort {
 
-    /** max size of the working memory pool in bytes */
     private static final int MEMBYTES = 50000;
-    /** size of a single record in bytes: 4 bytes for key and 4 for value */
     private static final int RECORD_SIZE = 8;
-    /** block size in bytes for one disk */
     private static final int BLOCK_SIZE = 4096;
-    /** the working memory pool */
     private byte[] workingMem = new byte[MEMBYTES];
 
     /**
-     * Create a new ExternalSort object.
-     * 
+     * Sorts the binary file at the given path using external sort.
+     * Splits the file into sorted runs, then merges them back together.
+     *
      * @param theFileName
      *            The name of the file to be sorted
      * @throws IOException
      */
     public static void sort(String theFileName) throws IOException {
-        // ---------------------------------------------------------------
-        // SETUP
         ExternalSort sorter = new ExternalSort();
         File f = new File(theFileName);
-        long originalFileSize = f.length();
+        long fileSize = f.length();
 
-        // output buffer is at the last block of the memory pool
         int outputBufStart = MEMBYTES - BLOCK_SIZE;
-        // heap is in memory pool before the output buffer
         int heapAreaSize = outputBufStart;
-        // num records that the heap can hold
         int heapRecordCap = heapAreaSize / RECORD_SIZE;
-        // amt of bytes the heap can hold
         int heapBytesCap = heapRecordCap * RECORD_SIZE;
 
-        // making the files for reading
-        RandomAccessFile theFile =
-            new RandomAccessFile(theFileName, "rw");
-        RandomAccessFile tempFile =
-            new RandomAccessFile("tempSortFile.bin", "rw");
+        RandomAccessFile theFile = new RandomAccessFile(theFileName, "rw");
+        RandomAccessFile tempFile = new RandomAccessFile("tempSortFile.bin",
+            "rw");
         tempFile.setLength(0);
 
-        // ---------------------------------------------------------------
-        // HEAP SORTING: putting the input file data into the heap and then
-        // sorting it in the heap to make it a minheap
-        
         int numRuns = 0;
         long bytesRead = 0;
 
-        while (bytesRead < originalFileSize) {
-            // reading the file size and stopping when the heap bytes cap
-            // has been reached
-            int bytesToRead = (int)Math.min(
-                heapBytesCap, originalFileSize - bytesRead);
+        while (bytesRead < fileSize) {
+            int bytesToRead = (int)Math.min(heapBytesCap, fileSize - bytesRead);
             theFile.seek(bytesRead);
             theFile.readFully(sorter.workingMem, 0, bytesToRead);
 
             int numRecs = bytesToRead / RECORD_SIZE;
+            MinHeap heap = new MinHeap(sorter.workingMem, 0, numRecs, numRecs);
 
-            // making the heap
-                // heap gets sorted upon initialization in the 
-                // constructor of the minheap class
-            MinHeap heap = new MinHeap(
-                sorter.workingMem, 0, numRecs, numRecs);
+            sorter.extractAndWrite(heap, tempFile, bytesRead, numRecs,
+                outputBufStart);
 
-            // gets the sorted records from the heap and puts 
-            // it into the output buffer, then it will flush the 
-            // records from the buffer to the disk when it is full
-            sorter.extractAndWrite(heap, tempFile, bytesRead,
-                numRecs, outputBufStart);
-
-            // updating counter of # of bytes read already and 
-            // the counter for the number of runs completed
             bytesRead += bytesToRead;
             numRuns++;
         }
-        // ---------------------------------------------------------------
-        // MULTI WAY MERGING
-        
-        // multi-merge sorts when there is more than 1 run that occurred
+
         if (numRuns > 1) {
-            sorter.mergeRuns(tempFile, theFile, numRuns,
-                originalFileSize, heapBytesCap);
+            sorter.mergeRuns(tempFile, theFile, numRuns, fileSize,
+                heapBytesCap);
         }
-        else { 
-            // only 1 run executed -> moving all the records 
-            // from the 1 buffer to the output file
+        else {
+            // only one run, just copy temp back to the original file
             theFile.seek(0);
             tempFile.seek(0);
-            // holder for # bytes to move over
-            long remaining = originalFileSize;
-            // loops until the remaining variable is at 0, 
-            // meaning all bytes from the file size have been moved over in 
-            // increments of block size (4096 bytes at a time)
+            long remaining = fileSize;
             while (remaining > 0) {
                 int toRead = (int)Math.min(BLOCK_SIZE, remaining);
                 tempFile.readFully(sorter.workingMem, 0, toRead);
                 theFile.write(sorter.workingMem, 0, toRead);
-                // updating holder
                 remaining -= toRead;
             }
         }
@@ -114,157 +75,292 @@ public class ExternalSort {
         new File("tempSortFile.bin").delete();
     }
 
+
     /**
-     * Taking all the sorted records from the minheap and
-     * writes them to outFile using a block-sized (4096 bytes) output buffer
+     * Pulls sorted records out of the heap one by one and writes
+     * them to the output file through a block-sized buffer.
      *
-     * @param heap           the minHeap to extract from
-     * @param outFile        output file
-     * @param fileOffset     byte position in outFile to start writing
-     * @param numRecs        number of records to extract from the heap
-     * @param outputBufStart offset in workingMem for the output buffer
-     * 
-     * @throws IOException if file I/O fails
+     * @param heap
+     *            the minHeap to extract from
+     * @param outFile
+     *            output file
+     * @param fileOffset
+     *            byte position in outFile to start writing
+     * @param numRecs
+     *            number of records to extract from the heap
+     * @param outputBufStart
+     *            offset in workingMem for the output buffer
+     * @throws IOException
+     *             if file I/O fails
      */
     private void extractAndWrite(
-        MinHeap heap, RandomAccessFile outFile, long fileOffset,
-        int numRecs, int outputBufStart) throws IOException {
+        MinHeap heap,
+        RandomAccessFile outFile,
+        long fileOffset,
+        int numRecs,
+        int outputBufStart)
+        throws IOException {
 
         outFile.seek(fileOffset);
         int bufferIndex = 0;
 
-        // loops through the records in the heap and keeps taking 
-        // out the min record, writing it into the output file
         for (int i = 0; i < numRecs; i++) {
-            Record min = heap.removeMin();
-            byte[] data = min.toBytes();
-            System.arraycopy(data, 0, workingMem, outputBufStart + bufferIndex,
-                RECORD_SIZE);
+            int srcOffset = heap.removeMinOffset();
+            System.arraycopy(workingMem, srcOffset, workingMem, outputBufStart
+                + bufferIndex, RECORD_SIZE);
             bufferIndex += RECORD_SIZE;
 
-            // flushing buffer because it's full (has 4096 bytes)
             if (bufferIndex >= BLOCK_SIZE) {
                 outFile.write(workingMem, outputBufStart, bufferIndex);
                 bufferIndex = 0;
             }
         }
-        // flush leftover data
+
         if (bufferIndex > 0) {
             outFile.write(workingMem, outputBufStart, bufferIndex);
         }
     }
 
+
     /**
-     * Merging the runs together from the source into the outFile. Divides
-     * the workingMem pool and compares the different buffers and puts it
-     * into the workingMem.
+     * Merges all sorted runs into one sorted output using a k-way merge.
+     * Keeps a small heap of the current front record from each run so
+     * we can always grab the global minimum in O(log k) time.
      *
-     * @param in        file containing sorted runs
-     * @param outFile   file to write the merged output onto
-     * @param numRuns   number of runs executed
-     * @param totalBytes total bytes across all runs
-     * @param maxRunSize  max size of each run in bytes
-     * @throws IOException if file I/O fails
+     * @param in
+     *            file containing sorted runs
+     * @param outFile
+     *            file to write the merged output onto
+     * @param numRuns
+     *            number of runs to merge
+     * @param totalBytes
+     *            total bytes across all runs
+     * @param maxRunSize
+     *            max size of each run in bytes
+     * @throws IOException
+     *             if file I/O fails
      */
     private void mergeRuns(
-        RandomAccessFile in, RandomAccessFile outFile,
-        int numRuns, long totalBytes,
-        int maxRunSize) throws IOException {
+        RandomAccessFile in,
+        RandomAccessFile outFile,
+        int numRuns,
+        long totalBytes,
+        int maxRunSize)
+        throws IOException {
 
-        // dividing working memory pool
+// split memory evenly among all run buffers plus one output buffer
         int perRunBufSize = MEMBYTES / (numRuns + 1);
-        // taking in the boundaries of the buffer
         perRunBufSize = (perRunBufSize / RECORD_SIZE) * RECORD_SIZE;
         if (perRunBufSize < RECORD_SIZE) {
             perRunBufSize = RECORD_SIZE;
         }
 
-        // last piece of memory is saved for the output buffer
         int outputBufStart = numRuns * perRunBufSize;
         int outputBufSize = MEMBYTES - outputBufStart;
         int outputBufIndex = 0;
 
-        // file pointers and buffer indexes for each run
         long[] runFilePtr = new long[numRuns];
         long[] runEnd = new long[numRuns];
         int[] bufBytes = new int[numRuns];
         int[] bufNext = new int[numRuns];
-        boolean[] runDone = new boolean[numRuns];
 
-        // looping thru all the runs' buffers and setting values
         for (int i = 0; i < numRuns; i++) {
             runFilePtr[i] = (long)i * maxRunSize;
             runEnd[i] = Math.min(runFilePtr[i] + maxRunSize, totalBytes);
             bufBytes[i] = 0;
             bufNext[i] = 0;
-            runDone[i] = false;
         }
 
-        outFile.seek(0);
-        int completedRuns = 0;
+        // load the first chunk of each run into memory
+        int activeRuns = 0;
+        for (int i = 0; i < numRuns; i++) {
+            if (runFilePtr[i] < runEnd[i]) {
+                int toRead = (int)Math.min(perRunBufSize, runEnd[i]
+                    - runFilePtr[i]);
+                in.seek(runFilePtr[i]);
+                in.readFully(workingMem, i * perRunBufSize, toRead);
+                bufBytes[i] = toRead;
+                bufNext[i] = 0;
+                runFilePtr[i] += toRead;
+                activeRuns++;
+            }
+        }
 
-        // going through the runs and getting the mins from each buffer 
-        // until every buffer is used up
-        while (completedRuns < numRuns) {
-            int minIndex = -1;
-            int minValsKey = Integer.MAX_VALUE;
+        // seed the merge heap with the first key from each run
+        int heapSize = activeRuns;
+        int[] mergeKeys = new int[heapSize];
+        int[] mergeRun = new int[heapSize];
 
-            for (int i = 0; i < numRuns; i++) {
-                if (runDone[i]) {
-                    continue;
-                }
-
-                // refilling the current run's buffer from disk if exhausted
-                if (bufNext[i] >= bufBytes[i]) {
-                    if (runFilePtr[i] >= runEnd[i]) {
-                        // hits this code when the run is fully used
-                        runDone[i] = true;
-                        completedRuns++;
-                        continue;
-                    }
-                    int toRead = (int)Math.min(
-                        perRunBufSize, runEnd[i] - runFilePtr[i]);
-                    in.seek(runFilePtr[i]);
-                    in.readFully(
-                        workingMem, i * perRunBufSize, toRead);
-                    bufBytes[i] = toRead;
-                    bufNext[i] = 0;
-                    runFilePtr[i] += toRead;
-                }
-
-                // comparing the current run's current record key
+        int idx = 0;
+        for (int i = 0; i < numRuns; i++) {
+            if (bufBytes[i] > 0) {
                 int off = (i * perRunBufSize) + bufNext[i];
-                int key = ByteBuffer.wrap(
-                    workingMem, off, 4).getInt();
-                if (key < minValsKey) {
-                    minValsKey = key;
-                    minIndex = i;
-                }
+                mergeKeys[idx] = getKeyAt(off);
+                mergeRun[idx] = i;
+                idx++;
             }
+        }
 
-            if (minIndex == -1) {
-                break; // all runs have been looked at
-            }
+        buildMergeHeap(mergeKeys, mergeRun, heapSize);
 
-            // moving the min record into the output buffer
-            int offset = (minIndex * perRunBufSize) + bufNext[minIndex];
-            System.arraycopy(
-                workingMem, offset,
-                workingMem, outputBufStart + outputBufIndex,
-                RECORD_SIZE);
+        outFile.seek(0);
+
+        while (heapSize > 0) {
+            int minRunIdx = mergeRun[0];
+
+            // copy the minimum record into the output buffer
+            int srcOff = (minRunIdx * perRunBufSize) + bufNext[minRunIdx];
+            System.arraycopy(workingMem, srcOff, workingMem, outputBufStart
+                + outputBufIndex, RECORD_SIZE);
             outputBufIndex += RECORD_SIZE;
-            bufNext[minIndex] += RECORD_SIZE;
+            bufNext[minRunIdx] += RECORD_SIZE;
 
-            // flushes the buffer if it's full
             if (outputBufIndex >= outputBufSize) {
                 outFile.write(workingMem, outputBufStart, outputBufIndex);
                 outputBufIndex = 0;
             }
+
+            boolean hasNext = advanceRun(in, minRunIdx, perRunBufSize,
+                runFilePtr, runEnd, bufBytes, bufNext);
+
+            if (hasNext) {
+                // put the next record from this run at the top of the heap
+                int nextOff = (minRunIdx * perRunBufSize) + bufNext[minRunIdx];
+                mergeKeys[0] = getKeyAt(nextOff);
+                siftDownMerge(mergeKeys, mergeRun, heapSize, 0);
+            }
+            else {
+                // this run is done, pull the last heap entry up to 
+                // fill the gap
+                heapSize--;
+                if (heapSize > 0) {
+                    mergeKeys[0] = mergeKeys[heapSize];
+                    mergeRun[0] = mergeRun[heapSize];
+                    siftDownMerge(mergeKeys, mergeRun, heapSize, 0);
+                }
+            }
         }
 
-        // flushing out any leftover data
         if (outputBufIndex > 0) {
             outFile.write(workingMem, outputBufStart, outputBufIndex);
+        }
+    }
+
+
+    /**
+     * Moves to the next record in the given run's buffer.
+     * If the buffer is empty, reads the next chunk from disk.
+     * Returns false if the run has no more records left.
+     *
+     * @param in
+     *            the input file to read from
+     * @param runIdx
+     *            which run to advance
+     * @param perRunBufSize
+     *            size of each run's in-memory buffer
+     * @param runFilePtr
+     *            current read position in the file for each run
+     * @param runEnd
+     *            end position in the file for each run
+     * @param bufBytes
+     *            how many bytes are loaded in each run's buffer
+     * @param bufNext
+     *            current read offset within each run's buffer
+     * @return true if a next record is available, false if the run is done
+     * @throws IOException
+     *             if file I/O fails
+     */
+    private boolean advanceRun(
+        RandomAccessFile in,
+        int runIdx,
+        int perRunBufSize,
+        long[] runFilePtr,
+        long[] runEnd,
+        int[] bufBytes,
+        int[] bufNext)
+        throws IOException {
+
+        if (bufNext[runIdx] < bufBytes[runIdx]) {
+            return true;
+        }
+
+        if (runFilePtr[runIdx] >= runEnd[runIdx]) {
+            return false;
+        }
+
+        int toRead = (int)Math.min(perRunBufSize, runEnd[runIdx]
+            - runFilePtr[runIdx]);
+        in.seek(runFilePtr[runIdx]);
+        in.readFully(workingMem, runIdx * perRunBufSize, toRead);
+        bufBytes[runIdx] = toRead;
+        bufNext[runIdx] = 0;
+        runFilePtr[runIdx] += toRead;
+        return true;
+    }
+
+
+    /**
+     * Reads the 4-byte key stored at a given offset in working memory.
+     *
+     * @param off
+     *            byte offset in workingMem
+     * @return the integer key value
+     */
+    private int getKeyAt(int off) {
+        return ((workingMem[off] & 0xFF) << 24) | ((workingMem[off + 1]
+            & 0xFF) << 16) | ((workingMem[off + 2] & 0xFF) << 8)
+            | (workingMem[off + 3] & 0xFF);
+    }
+
+
+    /**
+     * Turns the parallel key/run arrays into a valid min-heap.
+     *
+     * @param keys
+     *            array of key values
+     * @param runs
+     *            array of run indices, kept in sync with keys
+     * @param size
+     *            number of elements in the heap
+     */
+    private void buildMergeHeap(int[] keys, int[] runs, int size) {
+        for (int i = (size / 2) - 1; i >= 0; i--) {
+            siftDownMerge(keys, runs, size, i);
+        }
+    }
+
+
+    /**
+     * Sifts the element at pos downward until the min-heap
+     * property is restored. Keeps the runs array in sync.
+     *
+     * @param keys
+     *            array of key values
+     * @param runs
+     *            array of run indices
+     * @param size
+     *            current heap size
+     * @param pos
+     *            index to start sifting from
+     */
+    private void siftDownMerge(int[] keys, int[] runs, int size, int pos) {
+        while (pos < size / 2) {
+            int child = 2 * pos + 1;
+            if (child + 1 < size && keys[child + 1] < keys[child]) {
+                child = child + 1;
+            }
+            if (keys[pos] <= keys[child]) {
+                return;
+            }
+            int tmpKey = keys[pos];
+            keys[pos] = keys[child];
+            keys[child] = tmpKey;
+
+            int tmpRun = runs[pos];
+            runs[pos] = runs[child];
+            runs[child] = tmpRun;
+
+            pos = child;
         }
     }
 }
