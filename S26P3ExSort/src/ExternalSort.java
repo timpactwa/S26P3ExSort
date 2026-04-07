@@ -354,18 +354,18 @@ public class ExternalSort {
         return true;
     }
 
-
+    
     /**
-     * Helper method that reads the 4-byte key for a record stored at 
-     * an offset in the working memory.
+     * Helper method that reads the 4-byte key for a record
+     * stored at a byte offset in the working memory pool
+     * by wrapping it in a ByteBuffer
      *
-     * @param off       byte offset in workingMem
-     * @return int      the integer key value
+     * @param off
+     *            byte offset in workingMem where the key starts
+     * @return the integer key value at that offset
      */
     private int getKeyAt(int off) {
-        return ((workingMem[off] & 0xFF) << 24) | ((workingMem[off + 1]
-            & 0xFF) << 16) | ((workingMem[off + 2] & 0xFF) << 8)
-            | (workingMem[off + 3] & 0xFF);
+        return ByteBuffer.wrap(workingMem, off, 4).getInt();
     }
 
 

@@ -1,3 +1,5 @@
+import java.nio.ByteBuffer;
+
 /**
  * The MinHeap Implementation. 
  * 
@@ -27,6 +29,7 @@ public class MinHeap {
      * that can hold 1 record at a time (each record 
      * is 8 bytes aka RECORD_SIZE) */
     private byte[] swapTemp = new byte[RECORD_SIZE];
+    private ByteBuffer heapBuffer;
 
     /**
      * Constructor for creating a MinHeap
@@ -49,6 +52,7 @@ public class MinHeap {
         baseOffset = offset;
         numHeapRecords = heapSize;
         maxSize = maxRecordCap;
+        heapBuffer = ByteBuffer.wrap(mem, baseOffset, maxSize * RECORD_SIZE);
         // creates the heap upon initialization of a MinHeap object
         buildHeap();
     }
@@ -223,19 +227,18 @@ public class MinHeap {
         return baseOffset + pos * RECORD_SIZE;
     }
 
-
+    
     /**
-     * Helper method that reads the 4-byte integer 
-     * key of the record at index pos.
+     * Helper method that reads the 4-byte integer
+     * key of the record at index pos using a ByteBuffer
+     * view over the heap region of the memory pool
      *
      * @param pos
-     *            record index
-     * @return the key value
+     *            record index in the heap
+     * @return the integer key value at that position
      */
     private int getKey(int pos) {
-        int off = byteOffset(pos);
-        return ((mem[off] & 0xFF) << 24) | ((mem[off + 1] & 0xFF) << 16)
-            | ((mem[off + 2] & 0xFF) << 8) | (mem[off + 3] & 0xFF);
+        return heapBuffer.getInt(pos * RECORD_SIZE);
     }
 
 
