@@ -8,8 +8,8 @@ import java.io.*;
 /**
  * The class containing the main method.
  *
- * @author {Your Name Here}
- * @version {Put Something Here}
+ * @author Brianna McDonald, Tim Pactwa
+ * @version 4.7.26
  */
 
 // On my honor:

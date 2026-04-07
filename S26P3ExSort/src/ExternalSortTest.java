@@ -135,4 +135,28 @@ public class ExternalSortTest extends TestCase {
     public void test2048() throws Exception {
         sortHelper(2048);
     }
+    
+    /**
+     * Testing when the setup has no file name for the args
+     */
+    public void testArguments() throws Exception {
+        String[] arguments = new String[0];
+        ExternalSortProj.main(arguments);
+        
+        assertTrue(systemOut().getHistory()
+            .contains("Usage: ExernalSortProj <data-file-name>"));
+        
+    }
+    
+    /**
+     * Testing when the setup has no file
+     */
+    public void testNoFile() throws Exception {
+        String[] arguments = {"fakeFile.bin"};
+        ExternalSortProj.main(arguments);
+        
+        assertTrue(systemOut().getHistory()
+            .contains("There is no such input file as |fakeFile.bin|"));
+        
+    }
 }
