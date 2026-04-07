@@ -66,6 +66,7 @@ public class ExternalSortTest extends TestCase {
         sortHelper(1);
     }
 
+
     /**
      * Test a file with 2 blocks
      * 
@@ -74,6 +75,7 @@ public class ExternalSortTest extends TestCase {
     public void test2() throws Exception {
         sortHelper(2);
     }
+
 
     /**
      * Test a file with 10 blocks
@@ -84,6 +86,7 @@ public class ExternalSortTest extends TestCase {
         sortHelper(10);
     }
 
+
     /**
      * Test a file with 100 blocks
      * 
@@ -92,6 +95,7 @@ public class ExternalSortTest extends TestCase {
     public void test100() throws Exception {
         sortHelper(100);
     }
+
 
     /**
      * Test a file with 101 blocks
@@ -102,6 +106,7 @@ public class ExternalSortTest extends TestCase {
         sortHelper(101);
     }
 
+
     /**
      * Test a file with 130 blocks
      * 
@@ -110,6 +115,7 @@ public class ExternalSortTest extends TestCase {
     public void test130() throws Exception {
         sortHelper(130);
     }
+
 
     /**
      * Test a file with 200 blocks
@@ -120,6 +126,7 @@ public class ExternalSortTest extends TestCase {
         sortHelper(200);
     }
 
+
     /**
      * Test a file with 1001 blocks
      * 
@@ -129,6 +136,7 @@ public class ExternalSortTest extends TestCase {
         sortHelper(1001);
     }
 
+
     /**
      * Test a file with 2048 blocks
      * 
@@ -137,31 +145,34 @@ public class ExternalSortTest extends TestCase {
     public void test2048() throws Exception {
         sortHelper(2048);
     }
-    
+
+
     /**
      * Testing when the setup has no file name for the args
      */
     public void testArguments() throws Exception {
         String[] arguments = new String[0];
         ExternalSortProj.main(arguments);
-        
-        assertTrue(systemOut().getHistory()
-            .contains("Usage: ExernalSortProj <data-file-name>"));
-        
+
+        assertTrue(systemOut().getHistory().contains(
+            "Usage: ExernalSortProj <data-file-name>"));
+
     }
-    
+
+
     /**
      * Testing when the setup has no file
      */
     public void testNoFile() throws Exception {
-        String[] arguments = {"fakeFile.bin"};
+        String[] arguments = { "fakeFile.bin" };
         ExternalSortProj.main(arguments);
-        
-        assertTrue(systemOut().getHistory()
-            .contains("There is no such input file as |fakeFile.bin|"));
-        
+
+        assertTrue(systemOut().getHistory().contains(
+            "There is no such input file as |fakeFile.bin|"));
+
     }
-    
+
+
     /**
      * Testing records
      */
@@ -172,12 +183,13 @@ public class ExternalSortTest extends TestCase {
         int val = 7777;
         buff.putInt(key);
         buff.putInt(val);
-        
+
         Record rec = new Record(bytes);
         assertEquals("Key should be 4444", key, rec.getKey());
         assertEquals("Value should be 7777", val, rec.getValue());
     }
-    
+
+
     /**
      * Testing records
      */
@@ -188,17 +200,19 @@ public class ExternalSortTest extends TestCase {
         int val = 7777;
         buff.putInt(key);
         buff.putInt(val);
-        
+
         Record rec = new Record(bytes);
         byte[] expected = rec.toBytes();
-        
+
         assertEquals("Byte array length should be 8", 8, expected.length);
-        assertTrue("The output bytes should match the original bytes", Arrays.equals(bytes, expected));
-        
+        assertTrue("The output bytes should match the original bytes", Arrays
+            .equals(bytes, expected));
+
         assertEquals("Key should be 4444", key, rec.getKey());
         assertEquals("Value should be 7777", val, rec.getValue());
     }
-    
+
+
     /**
      * Testing heap
      */
@@ -206,21 +220,26 @@ public class ExternalSortTest extends TestCase {
         byte[] pool = new byte[40];
         MinHeap heap = new MinHeap(pool, 0, 0, 5);
         assertEquals("Heap size should initially be 0", 0, heap.heapSize());
-        
+
         byte[] recBytes = new byte[8];
         Record rec = new Record(recBytes);
         byte[] recBytes2 = new byte[8];
         Record rec2 = new Record(recBytes2);
-        
+
         heap.insert(rec);
-        assertEquals("Heap size should be 1 after one insertion", 1, heap.heapSize());
+        assertEquals("Heap size should be 1 after one insertion", 1, heap
+            .heapSize());
         heap.insert(rec2);
-        assertEquals("Heap size should be 2 after second insertion", 2, heap.heapSize());
-        
+        assertEquals("Heap size should be 2 after second insertion", 2, heap
+            .heapSize());
+
         heap.removeMin();
-        assertEquals("Heap size should be 1 after removing the minimum", 1, heap.heapSize());
-        
+        assertEquals("Heap size should be 1 after removing the minimum", 1, heap
+            .heapSize());
+
         MinHeap heap2 = new MinHeap(pool, 0, 3, 5);
-        assertEquals("Heap size should match the initial size passed to constructor", 3, heap2.heapSize());
+        assertEquals(
+            "Heap size should match the initial size passed to constructor", 3,
+            heap2.heapSize());
     }
 }
