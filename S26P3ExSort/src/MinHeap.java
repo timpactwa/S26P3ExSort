@@ -1,62 +1,72 @@
 /**
- * Min-heap that operates directly on a byte array (the working memory pool).
- * Records are 8 bytes each (4-byte key + 4-byte value) and are sorted
- * in-place within the provided byte array at a given offset.
- *
- * No separate Record[] is allocated — all data stays in the memory pool.
- *
- * @author Brianna McDonald
+ * The MinHeap Implementation. 
+ * 
+ * A MinHeap structure is a heap, a tree connected to an 
+ * array, which sorts its data values so that every internal 
+ * node's value is smaller than that of its children. The 
+ * smallest data value in the entire structure will always 
+ * be at the root of the tree every time the minHeap gets 
+ * reorganized post-insertion or post-deletion of a value.
+ * 
+ * @author Brianna McDonald, Tim Pactwa
  * @version Spring 2026
  */
-class MinHeap {
+public class MinHeap {
 
-    /** Size of each record in bytes. */
+    /** size of each record in bytes (4 for key, 4 for value */
     private static final int RECORD_SIZE = 8;
-    /** Reference to the working memory pool. */
+    /** the working memory pool */
     private byte[] mem;
-    /** Byte offset in mem where the heap region begins. */
+    /** byte offset in mem where the heap section starts */
     private int baseOffset;
-    /** Maximum number of records the heap can hold. */
+    /** max number of records the heap can have */
     private int maxSize;
-    /** Current number of records in the heap. */
-    private int n;
-    /** Temporary buffer for swapping records (8 bytes). */
+    /** current number of records in the heap */
+    private int numHeapRecords;
+    /** temp buffer variable for swapping records 
+     * that can hold 1 record at a time (each record 
+     * is 8 bytes aka RECORD_SIZE) */
     private byte[] swapTemp = new byte[RECORD_SIZE];
 
     /**
-     * Constructs a MinHeap over a region of the given byte array
-     * and builds the heap from the existing data in that region.
+     * Constructor for creating a MinHeap
+     * 
+     * Makes a MinHeap over a section of the given byte array
+     * and builds the heap from the data already in that area.
      *
      * @param memPool
      *            the working memory byte array
      * @param offset
-     *            byte offset where heap data begins in memPool
+     *            byte offset where heap data starts in memPool
      * @param heapSize
      *            number of records currently in the region
-     * @param max
+     * @param maxRecordCap
      *            maximum number of records the region can hold
      */
-    MinHeap(byte[] memPool, int offset, int heapSize, int max) {
+    MinHeap(byte[] memPool, int offset, int heapSize, int maxRecordCap) {
+        // setting up variable values for the minHeap
         mem = memPool;
         baseOffset = offset;
-        n = heapSize;
-        maxSize = max;
+        numHeapRecords = heapSize;
+        maxSize = maxRecordCap;
+        // creates the heap upon initialization of a MinHeap object
         buildHeap();
     }
 
 
     /**
-     * Returns the current number of elements in the heap.
+     * Getter function that returns the current number 
+     * of elements in the heap.
      *
      * @return current heap size
      */
     public int heapSize() {
-        return n;
+        return numHeapRecords;
     }
 
 
     /**
-     * Returns the maximum capacity of the heap.
+     * Getter function that returns the maximum capacity of the heap.
      *
      * @return max capacity in records
      */
@@ -66,14 +76,14 @@ class MinHeap {
 
 
     /**
-     * Returns true if pos is a leaf position.
+     * Returns true if current node is a leaf position.
      *
      * @param pos
      *            position to check
-     * @return true if pos is a leaf
+     * @return true if node is a leaf
      */
     public boolean isLeaf(int pos) {
-        return (n / 2 <= pos) && (pos < n);
+        return (numHeapRecords / 2 <= pos) && (pos < numHeapRecords);
     }
 
 
@@ -115,18 +125,20 @@ class MinHeap {
 
     /**
      * Removes and returns the minimum record from the heap.
-     * The returned Record is a copy — the heap region in mem
+     * The returned record is a copy — the heap region in mem
      * is modified in place.
      *
-     * @return the Record with the smallest key
+     * @return the record with the smallest key (the minimum record in the heap)
      */
     public Record removeMin() {
-        // Copy min record data before it gets overwritten
+        // copies min record data before it gets overwritten
         byte[] minData = new byte[RECORD_SIZE];
         System.arraycopy(mem, byteOffset(0), minData, 0, RECORD_SIZE);
 
-        n--;
-        swap(0, n);
+        // updates num records in heap and reorganizes 
+        // heap to make it a minHeap again
+        numHeapRecords--;
+        swap(0, numHeapRecords);
         siftDown(0);
 
         return new Record(minData);
@@ -135,16 +147,17 @@ class MinHeap {
 
     /**
      * Removes the minimum record and returns the byte offset in mem
-     * where the removed record now resides. This avoids creating a
-     * Record object, which is faster for bulk extraction.
+     * where the removed record is now.
      *
      * @return byte offset in mem of the removed record's data
      */
     public int removeMinOffset() {
-        n--;
-        swap(0, n);
+        // updating num of heap records then reorganizes the heap to make it
+        // a minHeap again and returns where the record's byte offset is. 
+        numHeapRecords--;
+        swap(0, numHeapRecords);
         siftDown(0);
-        return byteOffset(n);
+        return byteOffset(numHeapRecords);
     }
 
 
@@ -159,8 +172,8 @@ class MinHeap {
         byte[] data = new byte[RECORD_SIZE];
         System.arraycopy(mem, byteOffset(pos), data, 0, RECORD_SIZE);
 
-        n--;
-        swap(pos, n);
+        numHeapRecords--;
+        swap(pos, numHeapRecords);
         update(pos);
 
         return new Record(data);
@@ -176,9 +189,9 @@ class MinHeap {
      */
     public void insert(Record rec) {
         byte[] data = rec.toBytes();
-        System.arraycopy(data, 0, mem, byteOffset(n), RECORD_SIZE);
-        n++;
-        siftUp(n - 1);
+        System.arraycopy(data, 0, mem, byteOffset(numHeapRecords), RECORD_SIZE);
+        numHeapRecords++;
+        siftUp(numHeapRecords - 1);
     }
 
 
@@ -262,7 +275,7 @@ class MinHeap {
      * Builds the heap from the existing data in the memory region.
      */
     private void buildHeap() {
-        for (int i = parent(n - 1); i >= 0; i--) {
+        for (int i = parent(numHeapRecords - 1); i >= 0; i--) {
             siftDown(i);
         }
     }
@@ -277,10 +290,10 @@ class MinHeap {
     private void siftDown(int pos) {
         while (!isLeaf(pos)) {
             int child = leftChild(pos);
-            if (child >= n) {
+            if (child >= numHeapRecords) {
                 return;
             }
-            if ((child + 1 < n) && isLessThan(child + 1, child)) {
+            if ((child + 1 < numHeapRecords) && isLessThan(child + 1, child)) {
                 child = child + 1;
             }
             if (!isLessThan(child, pos)) {
