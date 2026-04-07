@@ -8,15 +8,13 @@ import student.TestCase;
  * @author CS3114/5040 Staff
  * @version Spring 2026
  */
-public class ExternalSortTest extends TestCase
-{
+public class ExternalSortTest extends TestCase {
     private CheckFile fileChecker;
 
     /**
      * This method sets up the tests that follow.
      */
-    public void setUp()
-    {
+    public void setUp() {
         fileChecker = new CheckFile();
     }
 
@@ -26,12 +24,12 @@ public class ExternalSortTest extends TestCase
      * Helper method for the tests: Run a test suite for a given size.
      * Creates two files (one "ascii" and one "binary") of the specified size,
      * then for each one, runs the sort and runs the checker.
-     * @param fileSize Number of (4096 byte) blocks to test for
+     * 
+     * @param fileSize
+     *            Number of (4096 byte) blocks to test for
      * @throws Exception
      */
-    public void sortHelper(int fileSize)
-        throws Exception
-    {
+    public void sortHelper(int fileSize) throws Exception {
 
         FileGenerator it = new FileGenerator();
         String namea = "input" + fileSize + "asave.bin";
@@ -59,59 +57,82 @@ public class ExternalSortTest extends TestCase
     // ----------------------------------------------------------
     /**
      * Test a file with 1 block
+     * 
      * @throws Exception
      */
-    public void test1()
-        throws Exception
-    {
+    public void test1() throws Exception {
         sortHelper(1);
     }
-    
-    public void test2()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 2 blocks
+     * 
+     * @throws Exception
+     */
+    public void test2() throws Exception {
         sortHelper(2);
     }
-    
-    public void test10()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 10 blocks
+     * 
+     * @throws Exception
+     */
+    public void test10() throws Exception {
         sortHelper(10);
     }
-    
-    public void test100()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 100 blocks
+     * 
+     * @throws Exception
+     */
+    public void test100() throws Exception {
         sortHelper(100);
     }
-    
-    public void test101()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 101 blocks
+     * 
+     * @throws Exception
+     */
+    public void test101() throws Exception {
         sortHelper(101);
     }
-    
-    public void test130()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 130 blocks
+     * 
+     * @throws Exception
+     */
+    public void test130() throws Exception {
         sortHelper(130);
     }
-    
-    public void test200()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 200 blocks
+     * 
+     * @throws Exception
+     */
+    public void test200() throws Exception {
         sortHelper(200);
     }
-    
-    public void test1001()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 1001 blocks
+     * 
+     * @throws Exception
+     */
+    public void test1001() throws Exception {
         sortHelper(1001);
     }
-    
-    public void test2048()
-        throws Exception
-    {
+
+    /**
+     * Test a file with 2048 blocks
+     * 
+     * @throws Exception
+     */
+    public void test2048() throws Exception {
         sortHelper(2048);
     }
 }
